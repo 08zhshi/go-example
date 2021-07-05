@@ -2,4 +2,6 @@ module gobyexample
 
 go 1.13
 
-require github.com/russross/blackfriday v1.5.2
+require (
+	go.uber.org/zap v1.18.1 // indirect
+)

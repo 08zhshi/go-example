@@ -1,0 +1,157 @@
+# 注意点
+
+# sync.WaitGroup 功能协程同步
+# state1 高32位计数器。等到其位0，唤起所有等到协程
+# state1 中32位等待协程数
+# state1 低32位为所有协程sema地址
+# Add函数增加或减少计数，计数器等于0且等待协程数大于0，唤醒所有等待协程
+# Wait函数loop{计数器等于0，直接返回。原子增加等待协程数{协程等待}}
+type WaitGroup struct {
+	noCopy noCopy
+
+	// 64-bit value: high 32 bits are counter, low 32 bits are waiter count.
+	// 64-bit atomic operations require 64-bit alignment, but 32-bit
+	// compilers do not ensure it. So we allocate 12 bytes and then use
+	// the aligned 8 bytes in them as state, and the other 4 as storage
+	// for the sema.
+	state1 [3]uint32
+}
+
+# base64加密将3字节转换为4个字节，3*8bit=4*6bit，2^6=64, 其中64的意思64个指定字符。
+# 意思3字节256个ASCII映射到4字节64个字符上。
+
+# channel通道特性：无缓冲和有缓冲，目前有缓冲管道关闭也不会丢失数据。
+# 通道可以只发送或只接收
+# 用于同步协程，如果等待多个协程，可以用waitgroup
+# 用于协程间通信
+# j, more := <- jobs 根据接收的第二个值，如果 `jobs` 已经关闭了
+# 并且通道中所有的值都已经接收完毕（不会数据丢失），那么 `more` 的值将是 `false`。
+# select...case...default 对应底层函数只包含一个case为selectnbrecv，多个selectgo
+
+# iota
+const (
+	a, b = iota, iota+1
+	c,d
+	e,f
+	g = iota
+)
+// iota值每行递增，同一行iota相等，没有表达式集成前面有的。
+fmt.Println(a,b,c,d,e,f,g) // 0 1 1 2 2 3 3
+
+// If block == false and no elements are available, returns (false, false).
+// Otherwise, if c is closed, zeros *ep and returns (true, false).
+// Otherwise, fills in *ep with an element and returns (true, true).
+// func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
+// for ...range 返回received。 select 单个通道，返回selected值
+
+# 闭包：能够读取其他函数内部变量的函数。「函数」和「函数内部能访问到的变量」（也叫环境）的总和，就是一个闭包。
+# 闭包常常用来「间接访问一个变量」。换句话说，「隐藏一个变量」。暴露一个访问器（函数），让别人可以「间接访问」。
+
+# 集合操作Index Include Any All Filter Map
+
+# 传递参数
+# os.Args提供原始命令行参数访问功能，切片中的第一个参数是该程序的路径，`os.Args[1:]`保存了程序全部的参数。
+# flag接收参数需要-指定参数名，建立os.Args基础上解析参数。
+# os.Setenv设置环境变量，os.Getenv获取环境变量。获取os.Environ所有环境变量，其格式"k=v"
+
+# 常量分全局和局部，常量值不可修改的。
+# context上下文。
+# 1、上层任务取消后，所有的下层任务都会被取消；
+# 2、中间某一层的任务取消后，只会将当前任务的下层任务取消，而不会影响上层的任务以及同级任务。
+
+# 反射, 原理将运行时使用类型保存到全局map，需要时通过nameoff、typeoff、textoff等字段从map获取相关信息。
+# reflect.Value包含数据和类型，reflect.Type是个接口类型，通过实例方法可以获取类型相应信息。
+# 关于为什么使用反射，这里列出两个常用场景：
+# 1、有时你需要编写一个函数，但是并不知道传给你的参数类型是什么，可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了。
+# 2、有时候需要根据某些条件决定调用哪个函数，比如根据用户的输入来决定。这时就需要对函数和函数的参数进行反射，在运行期间动态地执行函数。
+# 但是注意，使用反射是有有很多缺点的。比较重要的就是：性能损耗，以及代码的安全性。
+# 1、Go语言作为一门静态语言，编码过程中，编译器能提前发现一些类型错误，但是对于反射代码是无能为力的。所以包含反射相关的代码，很可能会运行很久，才会出错，这时候经常是直接 panic，可能会造成严重的后果。
+# 2、反射对性能影响还是比较大的，比正常代码运行速度慢一到两个数量级。所以，对于一个项目中处于运行效率关键位置的代码，尽量避免使用反射特性。
+// rtype is the common implementation of most values.
+// It is embedded in other struct types.
+//
+// rtype must be kept in sync with ../runtime/type.go:/^type._type.
+type rtype struct {
+	size       uintptr
+	ptrdata    uintptr // number of bytes in the type that can contain pointers
+	hash       uint32  // hash of type; avoids computation in hash tables
+	tflag      tflag   // extra type information flags
+	align      uint8   // alignment of variable with this type
+	fieldAlign uint8   // alignment of struct field with this type
+	kind       uint8   // enumeration for C
+	// function for comparing objects of this type
+	// (ptr to object A, ptr to object B) -> ==?
+	equal     func(unsafe.Pointer, unsafe.Pointer) bool
+	gcdata    *byte   // garbage collection data
+	str       nameOff // string form
+	ptrToThis typeOff // type for pointer to this type, may be zero
+}
+// A StructField describes a single field in a struct.
+type StructField struct {
+	// Name is the field name.
+	Name string
+	// PkgPath is the package path that qualifies a lower case (unexported)
+	// field name. It is empty for upper case (exported) field names.
+	// See https://golang.org/ref/spec#Uniqueness_of_identifiers
+	PkgPath string
+
+	Type      Type      // field type
+	Tag       StructTag // field tag string
+	Offset    uintptr   // offset within struct, in bytes
+	Index     []int     // index sequence for Type.FieldByIndex
+	Anonymous bool      // is an embedded field
+}
+
+// Method represents a single method.
+type Method struct {
+	// Name is the method name.
+	// PkgPath is the package path that qualifies a lower case (unexported)
+	// method name. It is empty for upper case (exported) method names.
+	// The combination of PkgPath and Name uniquely identifies a method
+	// in a method set.
+	// See https://golang.org/ref/spec#Uniqueness_of_identifiers
+	Name    string
+	PkgPath string
+
+	Type  Type  // method type
+	Func  Value // func with receiver as first argument
+	Index int   // index for Type.Method
+}
+
+# defer声明函数，在函数return后执行。程序调用panic，会执行g链表defer函数，直到碰到recover跳出执行剩下defer函数。
+# 如果没有碰到recover且链表defer为nil，则异常退出。
+
+# 从 Go 1.16 开始会废弃 io/ioutil 包，相关的功能会挪到 io 包或 os 包
+
+# time包，获取时间秒数、纳秒。将秒数与特定格式时间互相转换。
+# s := t.Format("2006-01-02 15:04:05.999999999 -0700 MST")
+
+// The error built-in interface type is the conventional interface for
+// representing an error condition, with the nil value representing no error.
+type error interface {
+	Error() string
+}
+# error接口，只要实现Error函数，就可以赋值给error接口。
+
+# syscall包syscall.Exec执行二进制程序如ls。开启子进程替换父进程资源（因为很多子进程运行程序结束，就完成了，该函数利用父进程资源，不需要重新分配资源），并执行二进制程序。
+# os.Exit退出，不会执行defer函数。
+# filepath包处理目录名和文件名方法集合，如：字符串组合文件路径、提取目录和文件名及扩展名。
+# go.uber.org/zap提供日志打印包，可以将函数名和行号打印。
+# bufio包将缓冲封装成io的读写操作，其可以用作行处理。
+# json包有序列化和反序列化，以及可以通过NewEncoder创建序列化器，将结果写入到io.Writer中。
+# bytes包字节操作（在切片查询字符、分割等）、缓冲读写操作
+# map容器，底层通过哈希实现的。
+# sync.mutex用于数据竞争。编译go build加上-race参数，就能检查竞争地方。
+# strconv包将数字与字符串相互转换。
+# rand包用于生成伪随机数。需要种子变化，生成不同随机数，相同种子生成随机数相同。NewSource和New生成*Rand，不然使用rand包全局*Rand变量。
+# regexp包正则表达式，匹配字符串。
+# crypto包有散列算法（md5、sha1）、对称加密算法（aes、des）、非对称加密算法（rsa）
+# os/signal包接收系统发送信号，进行相应处理。
+# 切片类型底层：Pointer、len、cap
+# sort包排序，可以实现Less、Len、Swap函数，完成自定义的切片排序。
+# exec包用于开启fork子进程执行二进制程序，父进程调用wait等待子进程结束。与execv系统调用不一样。
+# strings包用于字符串组合、切割、匹配等操作
+# time.ticker包NewTicker创建后需要调用Stop关闭，Tick不需要关闭（没有方法关闭）
+# net/url包解析url地址。
+# xml包将数据结构包装xml或者将xml解析为数据结构。
+
