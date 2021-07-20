@@ -32,15 +32,19 @@ func main() {
 	f := creatFile(fn)
 	defer closeFile(f)
 	writeFile(f)
-	//defer func() {
-	//	v := recover()
-	//	fmt.Println("3",v)
-	//}()
 	defer func() {
 		defer func() {
 			v := recover()
-			fmt.Println("2", v)
+			fmt.Println("4", v)
 		}()
+		//v := recover()
+		//fmt.Println("3",v)
+	}()
+	defer func() {
+		//defer func() {
+		//	v := recover()
+		//	fmt.Println("2", v)
+		//}()
 		defer func() {
 			defer func() {
 				fmt.Println("1")
@@ -48,6 +52,6 @@ func main() {
 			panic("test")
 		}()
 	}()
-	panic("main")
+	//panic("main")
 
 }
